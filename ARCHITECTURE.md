@@ -1,81 +1,81 @@
 # ARCHITECTURE — SphereRelaxator
 
-## Назначение
-`SphereRelaxator` — оффлайн инструмент релаксации сферической сетки (Goldberg/icosphere). Он выравнивает длины ребер, снижает локальные деформации (особенно вокруг пентагонов) и сохраняет геометрию обратно в JSON.
+## Purpose
+`SphereRelaxator` is an offline relaxer for Goldberg/icosphere meshes. It equalizes edge lengths, reduces local deformation (especially near pentagons), and writes updated geometry back to JSON.
 
-## Технологический стек
+## Tech stack
 - Java 17
 - Maven
 - Jackson
 
-## Высокоуровневый поток
-1. CLI принимает параметры релаксации.
-2. `io/*` читает входной JSON в доменную структуру mesh.
-3. `mesh/*` строит внутреннее представление графа вершин/тайлов.
-4. `solver/SphereRelaxator` выполняет итерации релаксации.
-5. После каждой итерации вершины проектируются на радиус сферы (`|v| = R`).
-6. Результат записывается в JSON; при необходимости добавляются UV для Unreal-формата.
+## High-level flow
+1. CLI reads relaxation parameters.
+2. `io/*` parses input JSON into mesh DTO/domain structures.
+3. `mesh/*` builds internal vertex/tile graph.
+4. `solver/SphereRelaxator` runs iterative relaxation.
+5. Each iteration re-projects vertices to target sphere radius (`|v| = R`).
+6. Result is exported to JSON; optional UV can be emitted for Unreal-like input.
 
-## Слои
+## Layers
 ### 1) CLI / orchestration
-- Класс: `com.sphererelaxator.SphereRelaxatorCli`
-- Роль: парсинг параметров (`iterations`, `step`, `radius`, веса компонентов, `threads`, `emitUv`) и запуск процесса.
+- Class: `com.sphererelaxator.SphereRelaxatorCli`
+- Responsibility: parse args (`iterations`, `step`, `radius`, weights, `threads`, `emitUv`) and run workflow.
 
 ### 2) Solver
-- Пакет: `com.sphererelaxator.solver`
-- Ключевые классы:
-  - `SphereRelaxator` — основной итеративный алгоритм;
-  - `RelaxationConfig` — конфигурация;
-  - `RelaxationMetrics` — метрики качества/сходимости.
+- Package: `com.sphererelaxator.solver`
+- Key classes:
+  - `SphereRelaxator` — core iterative algorithm;
+  - `RelaxationConfig` — configuration container;
+  - `RelaxationMetrics` — quality/convergence metrics.
 
 ### 3) Mesh model
-- Пакет: `com.sphererelaxator.mesh`
-- Ключевые классы:
+- Package: `com.sphererelaxator.mesh`
+- Key classes:
   - `Mesh`, `MeshBuilder`, `Tile`, `TileType`, `Vec3`.
-- Роль: топология и геометрия сетки.
+- Responsibility: topology + geometry representation.
 
 ### 4) IO DTO
-- Пакет: `com.sphererelaxator.io`
-- Классы: `MeshDocument`, `VertexDto`, `TileDto`
-- Роль: сериализация/десериализация JSON-контракта.
+- Package: `com.sphererelaxator.io`
+- Classes: `MeshDocument`, `VertexDto`, `TileDto`
+- Responsibility: JSON de/serialization contracts.
 
 ### 5) Format adapters / utilities
-- Пакет: `com.sphererelaxator.unreal`
-- Классы: `UnrealFormatProcessor`, `UnrealTileCsvExporter`
-- Роль: поддержка Unreal-like формата и экспортных вспомогательных артефактов.
+- Package: `com.sphererelaxator.unreal`
+- Classes: `UnrealFormatProcessor`, `UnrealTileCsvExporter`
+- Responsibility: Unreal-like format support and helper exports.
 
 ### 6) Optional generators
-- Пакет: `com.sphererelaxator.generator`
-- Классы: `IcosphereGenerator`, `FullSphereCsvGenerator`
-- Роль: генерация базовой тестовой геометрии.
+- Package: `com.sphererelaxator.generator`
+- Classes: `IcosphereGenerator`, `FullSphereCsvGenerator`
+- Responsibility: generate baseline test geometry.
 
-## Алгоритмическая модель
-На каждой итерации применяется комбинация воздействий:
-- spring-like коррекция длин ребер;
+## Algorithm model
+Each iteration combines:
+- spring-like edge-length correction;
 - Laplacian smoothing;
-- дополнительное расширение в окрестностях пентагонов.
+- pentagon-neighborhood expansion.
 
-После суммарного смещения каждая вершина нормализуется к целевому радиусу. Это сохраняет глобальную сферическую форму и устраняет радиальный дрейф.
+After applying displacement, every vertex is normalized back to target radius to preserve global spherical shape and prevent radial drift.
 
-## Вход/выход
-- Вход: JSON mesh (`vertices`, `tiles`, `radius`) или Unreal-like массивы.
-- Выход: обновленный JSON mesh; опционально UV-координаты для spherical mapping.
+## Input / output
+- Input: JSON mesh (`vertices`, `tiles`, `radius`) or Unreal-like arrays.
+- Output: updated JSON mesh, optional spherical UV.
 
-## Интеграции
-- Используется как подготовительный этап геометрии для `PlanetSurfaceGenerator`/клиентского рендера.
-- Может экспортировать промежуточные артефакты в CSV для диагностики.
+## Integrations
+- Used as geometry pre-processing step for `PlanetSurfaceGenerator` / rendering pipeline.
+- Can emit CSV diagnostics for analysis.
 
-## Точки расширения
-- Добавление новых метрик сходимости в `RelaxationMetrics`.
-- Новые политики шага/весов в `RelaxationConfig`.
-- Новые адаптеры форматов входа/выхода рядом с `unreal/*`.
+## Extension points
+- Add convergence metrics in `RelaxationMetrics`.
+- Add step/weight policies in `RelaxationConfig`.
+- Add new file-format adapters near `unreal/*`.
 
-## Риски
-- Переизбыточный шаг релаксации может вызывать локальные артефакты/осцилляции.
-- Высокое число итераций заметно увеличивает время выполнения.
-- Несовместимость внешнего JSON-контракта ломает импортер без адаптера.
+## Risks
+- Excessive step size can cause local artifacts/oscillation.
+- High iteration count increases runtime significantly.
+- External JSON schema changes can break importer without adapter update.
 
-## Быстрая навигация
+## Quick navigation
 - Entry point: `src/main/java/com/sphererelaxator/SphereRelaxatorCli.java`
 - Solver: `src/main/java/com/sphererelaxator/solver/SphereRelaxator.java`
 - Mesh model: `src/main/java/com/sphererelaxator/mesh/`
